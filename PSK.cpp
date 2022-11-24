@@ -397,9 +397,12 @@ void PSK::addPreamble() {
  * @brief Adds the postamble to the bit stream.
  */
 void PSK::addPostamble() {
-    static unsigned char zeros[1] = {0x00};
+    static unsigned char ones[1] = {0xff};
+    while ((32 - bit_stream_offset_) >= 1) {
+        addBits(ones, 1);
+    }
     for (int i = 0; i < postamble_length_; i++) {
-        addBits(zeros, 1);
+        addBits(ones, 1);
     }
 }
 
@@ -424,6 +427,14 @@ int PSK::popNextBit() {
     return bit ? 1 : 0;
 }
 
+int PSK::peakNextBit() {
+    if (bit_stream_index_ >= bit_stream_.size()) { // No more bits in bit stream
+        return -1;
+    }
+    uint32_t bit = bit_stream_[bit_stream_index_] & (1 << (31 - bit_stream_offset_));
+    return bit ? 1 : 0;
+}
+
 // Modulation Methods
 /**
  * @brief Goes throught he bit stream and modulates with the addSymbol method.
@@ -433,16 +444,20 @@ int PSK::popNextBit() {
 void PSK::encodeBitStream() {
     if (mode_ == BPSK125 || mode_ == BPSK250 || mode_ == BPSK500) { // BPSK modulation
         int bit = popNextBit();
+        int next_bit = peakNextBit();
         int last_phase = 0; // 0 = 0, 1 = M_PI
         while (bit != -1) { 
             if (bit) { // Encode a 1 by keeping the phase shift the same
-                addSymbol(last_phase ? 0 : M_PI);
+                int filter_end = next_bit == 1 ? 0 : 1; // If next bit is 1, do not filter end of symbol.
+                addSymbol(last_phase ? 0 : M_PI, filter_end);
             } else if (!bit) { // Encode a 0 by switching phase
-                addSymbol(last_phase ? M_PI : 0);
+                int filter_end = next_bit == 1 ? 0 : 1; // If next bit is 1, do not filter end of symbol.
+                addSymbol(last_phase ? M_PI : 0, filter_end);
                 last_phase = !last_phase;
             }
             last_phase ? "1" : "0";
             bit = popNextBit();
+            next_bit = peakNextBit();
         }
     } else if (mode_ == QPSK125 || mode_ == QPSK250 || mode_ == QPSK500) { // QPSK modulation
 
@@ -454,16 +469,36 @@ void PSK::encodeBitStream() {
  * wav file.
  * 
  * @param shift The shift of the carrier wave in radians
+ * @param filter_end Whether or not to apply the filter to the end of the symbol
  */
-void PSK::addSymbol(int shift) {
+void PSK::addSymbol(int shift, int filter_end) {
+    const double power = 2.0;
+    const double roll_off = 2.9;
+    const double amplitude = 0.3;
+
+    
+
+    double time = 0 - (samples_per_symbol_ / 2);
+    std::cout << "Adding symbol" << std::endl;
     for (int i = 0; i < samples_per_symbol_; i++) {
-        int sample = std::cos(carrier_wave_angle_ + shift) * max_amplitude_;
+        double unfiltered = std::cos(carrier_wave_angle_ + shift);
+        double filter = std::pow(std::cos( (abs(time) / samples_per_symbol_) * roll_off ), power);
+        if (!last_symbol_end_filtered_ && (time < 0)) {
+            filter = 1;
+        }
+        if (!filter_end && (time > 0)) { // Remove filter from end of symbol
+            filter = 1;
+        }
+        std::cout << filter << std::endl;
+        int sample = amplitude * filter * unfiltered * max_amplitude_;
         carrier_wave_angle_ += angle_delta_;
+        time += 1;
         if (carrier_wave_angle_ > 2 * M_PI) {
             carrier_wave_angle_ -= 2 * M_PI;
         }
         writeBytes(sample, 2); // write sample to wav file
     }
+    last_symbol_end_filtered_ = filter_end;
 }
 
 int main(int argc, char** argv) {
@@ -512,9 +547,10 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    if (callsign != "N0CALL") {
+    if (callsign == "N0CALL") {
         PSK psk(output_file, mode);
         psk.encodeTextData(message);
+        psk.dumpBitStream();
     } else {
         PSK psk(output_file, mode, callsign);
         psk.encodeTextData(message);

@@ -42,8 +42,8 @@ class PSK {
         const int morse_dit_length_ = 100; // milliseconds
         const int morse_dah_length_ = 300; // milliseconds
         
-        const int preamble_length_ = 32; // symbols
-        const int postamble_length_ = 32; // symbols
+        const int preamble_length_ = 64; // symbols
+        const int postamble_length_ = 64; // symbols
 
         std::string file_path_;
         Mode mode_;
@@ -71,6 +71,7 @@ class PSK {
         void addPreamble();
         void addPostamble();
         int popNextBit();
+        int peakNextBit();
         
         /**
          * @details Bit stream is an array of 32 bit integers.
@@ -96,7 +97,7 @@ class PSK {
 
         // Modulation members and methods
         void encodeBitStream();
-        void addSymbol(int shift);
+        void addSymbol(int shift, int next_shift);
 
         int symbol_rate_; // Symbol rate of the PSK modulation in Sym/s (125, 250, 500)
         int carrier_freq_ = 1500; // Carrier frequency in Hz (1500)
@@ -104,6 +105,7 @@ class PSK {
 
         double carrier_wave_angle_ = 0.0f;
         double angle_delta_;
+        int last_symbol_end_filtered_ = 1;
         
         int last_bit_ = 0;
         unsigned char conv_code_buffer_ = 0;
