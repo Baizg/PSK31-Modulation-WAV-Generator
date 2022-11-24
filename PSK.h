@@ -18,8 +18,7 @@
 #include <stdexcept>
 #include <cmath>
 #include <vector>
-
-#define PI 3.14159265358979323846
+#include <math.h>
 
 class PSK {
     public:
@@ -100,8 +99,14 @@ class PSK {
         void addSymbol(int shift);
 
         int symbol_rate_; // Symbol rate of the PSK modulation in Sym/s (125, 250, 500)
-        int carrier_freq_; // Carrier frequency in Hz (1500)
+        int carrier_freq_ = 1500; // Carrier frequency in Hz (1500)
         int samples_per_symbol_; // floor(sample_rate_ / symbol_rate_)
+
+        double carrier_wave_angle_ = 0.0f;
+        double angle_delta_;
+        
+        int last_bit_ = 0;
+        unsigned char conv_code_buffer_ = 0;
 };
 
 
