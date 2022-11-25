@@ -207,6 +207,9 @@ void PSK::setup(Mode mode, SymbolRate symbol_rate) {
         case S500:
             symbol_rate_ = 500.0;
             break;
+        case S1000:
+            symbol_rate_ = 1000.0;
+            break;
         default:
             throw std::invalid_argument("Invalid symbol rate");
             break;
@@ -385,7 +388,7 @@ void PSK::addPreamble() {
  * @cite https://www.mail-archive.com/fldigi-alpha@lists.berlios.de/msg01032.html
  */
 void PSK::addPostamble() {
-    const int fldigi_postamble_mode_ = 1;
+    const int fldigi_postamble_mode_ = 0;
     static unsigned char zeros[1] = {0x00};
     static unsigned char ones[1] = {0xFF};
     while ((32 - bit_stream_offset_) >= 1) {
@@ -536,6 +539,8 @@ int main(int argc, char** argv) {
                 symbol_rate = PSK::S250;
             } else if (std::string(argv[i + 1]) == "500") {
                 symbol_rate = PSK::S500;
+            } else if (std::string(argv[i + 1]) == "1000") {
+                symbol_rate = PSK::S1000;
             } else {
                 std::cout << "Invalid symbol rate: -s 125 | -s 250 | -s 500" << std::endl;
                 return 1;
@@ -569,7 +574,7 @@ int main(int argc, char** argv) {
     }
 
     std::cout << "Mode: " << (mode == PSK::BPSK ? "BPSK" : "QPSK") << ", ";
-    std::cout << "Symbol Rate: " << (symbol_rate == PSK::S125 ? "125" : (symbol_rate == PSK::S250 ? "250" : "500")) << ", ";
+    std::cout << "Symbol Rate: " << (symbol_rate == PSK::S125 ? "125" : (symbol_rate == PSK::S250 ? "250" : (symbol_rate == PSK::S500 ? "500" : "1000"))) << ", ";
     std::cout << "Filename: " << filename << std::endl;
     std::cout << "Generating audio file..." << std::endl;
 

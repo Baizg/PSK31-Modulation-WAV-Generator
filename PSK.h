@@ -34,7 +34,8 @@ class PSK {
             S63, 
             S125, 
             S250, 
-            S500
+            S500,
+            S1000
         };
 
         PSK(std::string file_path, Mode mode, SymbolRate sym_rate);
