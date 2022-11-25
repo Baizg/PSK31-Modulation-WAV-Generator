@@ -19,16 +19,26 @@
 #include <cmath>
 #include <vector>
 #include <math.h>
+#include <exception>
+#include <sstream>
 
 class PSK {
     public:
         enum Mode { 
-            BPSK125, BPSK250, BPSK500,
-            QPSK125, QPSK250, QPSK500, 
+            BPSK,
+            QPSK
             };
 
-        PSK(std::string file_path, Mode mode);
-        PSK(std::string fuile_path, Mode mode, std::string call_sign);
+        enum SymbolRate {
+            S31, 
+            S63, 
+            S125, 
+            S250, 
+            S500
+        };
+
+        PSK(std::string file_path, Mode mode, SymbolRate sym_rate);
+        PSK(std::string fuile_path, Mode mode, SymbolRate sym_rate, std::string call_sign);
         ~PSK();
 
         bool encodeTextData(std::string message);
@@ -38,6 +48,7 @@ class PSK {
 
     private:
         // Configuration
+        void setup(Mode mode, SymbolRate baud);
         const int morse_frequency_ = 600;
         const int morse_dit_length_ = 100; // milliseconds
         const int morse_dah_length_ = 300; // milliseconds
@@ -97,9 +108,9 @@ class PSK {
 
         // Modulation members and methods
         void encodeBitStream();
-        void addSymbol(int shift, int next_shift);
+        void addSymbol(double shift, int next_shift);
 
-        int symbol_rate_; // Symbol rate of the PSK modulation in Sym/s (125, 250, 500)
+        double symbol_rate_; // Symbol rate of the PSK modulation in Sym/s (125, 250, 500)
         int carrier_freq_ = 1500; // Carrier frequency in Hz (1500)
         int samples_per_symbol_; // floor(sample_rate_ / symbol_rate_)
 
@@ -403,38 +414,38 @@ static std::unordered_map<std::string, int> varicode_to_ascii = {
  * 0x00 to 0x1F.
  * @cite http://www.arrl.org/psk31-spec
  */
-std::map <unsigned char, int> conv_code = {
-    {00000, 180},
-    {00001, 90 },
-    {00010, -90},
-    {00011, 0  },
-    {00100, -90},
-    {00101, 0  },
-    {00110, 180},
-    {00111, 90 },
-    {01000, 0  },
-    {01001, -90},
-    {01010, 90 },
-    {01011, 180},
-    {01100, 90 },
-    {01101, 180},
-    {01110, 0 },
-    {01111, -90},
-    {10000, 90 },
-    {10001, 180},
-    {10010, 0  },
-    {10011, -90},
-    {10100, 0  },
-    {10101, -90},
-    {10110, 90 },
-    {10111, 180},
-    {11000, -90},
-    {11001, 0  },
-    {11010, 180},
-    {11011, 90 },
-    {11100, 180},
-    {11101, 90 },
-    {11110, -90},
-    {11111, 0  }
+std::map <unsigned char, double> conv_code = {
+    {0b00000, M_PI},
+    {0b00001, M_PI/2.0 },
+    {0b00010, -(M_PI/2.0)},
+    {0b00011, 0  },
+    {0b00100, -(M_PI/2.0)},
+    {0b00101, 0  },
+    {0b00110, M_PI},
+    {0b00111, M_PI/2.0 },
+    {0b01000, 0  },
+    {0b01001, -(M_PI/2.0)},
+    {0b01010, M_PI/2.0 },
+    {0b01011, M_PI},
+    {0b01100, M_PI/2.0 },
+    {0b01101, M_PI},
+    {0b01110, 0 },
+    {0b01111, -(M_PI/2.0)},
+    {0b10000, M_PI/2.0 },
+    {0b10001, M_PI},
+    {0b10010, 0  },
+    {0b10011, -(M_PI/2.0)},
+    {0b10100, 0  },
+    {0b10101, -(M_PI/2.0)},
+    {0b10110, M_PI/2.0 },
+    {0b10111, M_PI},
+    {0b11000, -(M_PI/2.0)},
+    {0b11001, 0  },
+    {0b11010, M_PI},
+    {0b11011, M_PI/2.0 },
+    {0b11100, M_PI},
+    {0b11101, M_PI/2.0 },
+    {0b11110, -(M_PI/2.0)},
+    {0b11111, 0  }
 };
 #endif // CONVOLUTIONAL_H_

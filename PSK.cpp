@@ -56,38 +56,11 @@
  * @param file_path Path to where the wav file will be saved
  * @param mode BPSK125, BPSK250, BPSK500, QPSK125, QPSK250, QPSK500
  */
-PSK::PSK(std::string file_path, Mode mode) {
+PSK::PSK(std::string file_path, Mode mode, SymbolRate sym_rate) {
     file_path_ = file_path;
-    mode_ = mode;
     call_sign_ = "";
     morse_callsign_ = false;
-    angle_delta_ = 2.0 * M_PI * ( (double) carrier_freq_ / (double) sample_rate_ );
-
-    switch (mode_) {
-        case BPSK125:
-            symbol_rate_ = 125;
-            break;
-        case BPSK250:
-            symbol_rate_ = 250;
-            break;
-        case BPSK500:
-            symbol_rate_ = 500;
-            break;
-        case QPSK125:
-            symbol_rate_ = 125;
-            break;
-        case QPSK250:
-            symbol_rate_ = 250;
-            break;
-        case QPSK500:
-            symbol_rate_ = 500;
-            break;
-        default:
-            throw std::invalid_argument("Invalid mode");
-            break;
-    }
-
-    samples_per_symbol_ = std::floor(sample_rate_ / symbol_rate_);
+    setup(mode, sym_rate);
 }
 
 /**
@@ -98,38 +71,12 @@ PSK::PSK(std::string file_path, Mode mode) {
  * @param mode BPSK125, BPSK250, BPSK500, QPSK125, QPSK250, QPSK500
  * @param call_sign Callsign - must be at least 4 characters
  */
-PSK::PSK(std::string file_path, Mode mode, std::string call_sign) {
+PSK::PSK(std::string file_path, Mode mode, SymbolRate sym_rate, std::string call_sign) {
     file_path_ = file_path;
     mode_ = mode;
     call_sign_ = call_sign;
     morse_callsign_ = true;
-    angle_delta_ = 2.0 * M_PI * ( (double) carrier_freq_ / (double) sample_rate_ );
-
-    switch (mode_) {
-        case BPSK125:
-            symbol_rate_ = 125;
-            break;
-        case BPSK250:
-            symbol_rate_ = 250;
-            break;
-        case BPSK500:
-            symbol_rate_ = 500;
-            break;
-        case QPSK125:
-            symbol_rate_ = 125;
-            break;
-        case QPSK250:
-            symbol_rate_ = 250;
-            break;
-        case QPSK500:
-            symbol_rate_ = 500;
-            break;
-        default:
-            throw std::invalid_argument("Invalid mode");
-            break;
-    }
-
-    samples_per_symbol_ = std::floor(sample_rate_ / symbol_rate_);
+    setup(mode, sym_rate);
 }
 
 PSK::~PSK() {
@@ -231,6 +178,43 @@ void PSK::dumpBitStream() {
 }
 
 // Private Methods
+
+void PSK::setup(Mode mode, SymbolRate symbol_rate) {
+    mode_ = mode;
+    switch (mode) {
+        case BPSK:
+            break;
+        case QPSK:
+            break;
+        default:
+            throw std::invalid_argument("Invalid mode");
+            break;
+    }
+
+    switch (symbol_rate) {
+        case S31:
+            symbol_rate_ = 31.5;
+            break;
+        case S63:
+            symbol_rate_ = 63.5;
+            break;
+        case S125:
+            symbol_rate_ = 125.0;
+            break;
+        case S250:
+            symbol_rate_ = 250.0;
+            break;
+        case S500:
+            symbol_rate_ = 500.0;
+            break;
+        default:
+            throw std::invalid_argument("Invalid symbol rate");
+            break;
+    }
+
+    angle_delta_ = 2.0 * M_PI * ( (double) carrier_freq_ / (double) sample_rate_ );
+    samples_per_symbol_ = std::floor(sample_rate_ / symbol_rate_);
+}
 
 /**
  * @brief Opens the wav file and writes the header.
@@ -395,14 +379,20 @@ void PSK::addPreamble() {
 
 /**
  * @brief Adds the postamble to the bit stream.
+ * Fldigi seems to use the incorrect postamble in QPSK mode.
+ * It uses reapeated 0s instead of 1s. This is a workaround.
+ * If you are not using fldigi, set the flag to 0.
+ * @cite https://www.mail-archive.com/fldigi-alpha@lists.berlios.de/msg01032.html
  */
 void PSK::addPostamble() {
-    static unsigned char ones[1] = {0xff};
+    const int fldigi_postamble_mode_ = 1;
+    static unsigned char zeros[1] = {0x00};
+    static unsigned char ones[1] = {0xFF};
     while ((32 - bit_stream_offset_) >= 1) {
-        addBits(ones, 1);
+        addBits((mode_ == QPSK && fldigi_postamble_mode_ ? zeros : ones), 1);
     }
     for (int i = 0; i < postamble_length_; i++) {
-        addBits(ones, 1);
+        addBits((mode_ == QPSK && fldigi_postamble_mode_ ? zeros : ones), 1);
     }
 }
 
@@ -427,6 +417,10 @@ int PSK::popNextBit() {
     return bit ? 1 : 0;
 }
 
+/**
+ * @brief Returns the next bit of the bit stream without removing it.
+ * @return int [1, 0, -1] -1 = no more bits in bit stream
+ */
 int PSK::peakNextBit() {
     if (bit_stream_index_ >= bit_stream_.size()) { // No more bits in bit stream
         return -1;
@@ -442,7 +436,7 @@ int PSK::peakNextBit() {
  * is encoded by keeping the phase shift the same.
  */
 void PSK::encodeBitStream() {
-    if (mode_ == BPSK125 || mode_ == BPSK250 || mode_ == BPSK500) { // BPSK modulation
+    if (mode_ == BPSK) { // BPSK modulation
         int bit = popNextBit();
         int next_bit = peakNextBit();
         int last_phase = 0; // 0 = 0, 1 = M_PI
@@ -459,8 +453,20 @@ void PSK::encodeBitStream() {
             bit = popNextBit();
             next_bit = peakNextBit();
         }
-    } else if (mode_ == QPSK125 || mode_ == QPSK250 || mode_ == QPSK500) { // QPSK modulation
-
+    } else if (mode_ == QPSK) { // QPSK modulation
+        unsigned char buffer = 0;
+        int bit = popNextBit();
+        int shift = 0;
+        while (bit != -1) {
+            buffer = ((buffer << 1) | bit) & 0x1f;
+            int filter_end = 0;
+            if (shift != conv_code[buffer]) {
+                filter_end = 1;
+            }
+            shift += conv_code[buffer];
+            addSymbol(shift, filter_end);
+            bit = popNextBit();
+        }
     }
 }
 
@@ -468,18 +474,15 @@ void PSK::encodeBitStream() {
  * @brief Modulates a single symbol in BPSK/QPSK and saves the audio data to the
  * wav file.
  * 
- * @param shift The shift of the carrier wave in radians
+ * @param shift The shift of the carrier wave in degrees
  * @param filter_end Whether or not to apply the filter to the end of the symbol
  */
-void PSK::addSymbol(int shift, int filter_end) {
+void PSK::addSymbol(double shift, int filter_end) {
     const double power = 2.0;
     const double roll_off = 2.9;
-    const double amplitude = 0.3;
-
-    
+    const double amplitude = .5;
 
     double time = 0 - (samples_per_symbol_ / 2);
-    std::cout << "Adding symbol" << std::endl;
     for (int i = 0; i < samples_per_symbol_; i++) {
         double unfiltered = std::cos(carrier_wave_angle_ + shift);
         double filter = std::pow(std::cos( (abs(time) / samples_per_symbol_) * roll_off ), power);
@@ -489,7 +492,6 @@ void PSK::addSymbol(int shift, int filter_end) {
         if (!filter_end && (time > 0)) { // Remove filter from end of symbol
             filter = 1;
         }
-        std::cout << filter << std::endl;
         int sample = amplitude * filter * unfiltered * max_amplitude_;
         carrier_wave_angle_ += angle_delta_;
         time += 1;
@@ -501,62 +503,77 @@ void PSK::addSymbol(int shift, int filter_end) {
     last_symbol_end_filtered_ = filter_end;
 }
 
+/**
+ * @brief Main function for when using as a command line utility.
+ * @details
+ * Usage: ./psk -m [mode] -s [symbol_rate] -f [filename] -t "text to encode"
+ * or echo "test" | ./psk # uses defaults 
+ */
 int main(int argc, char** argv) {
-    if (argc < 2) {
-        std::cout << "Usage: " << std::endl;
-        std::cout << "psk \"<message>\" -m <mode> -f <output_file> -c <callsign>" << std::endl;
-        std::cout << "Modes: b125, b250, b500, q125, q250, q500" << std::endl;
-        std::cout << "If a callsign is specified, it will be added to the audio in morse code." << std::endl;
-        std::cout << "If you do not want this, add the callsign to the message." << std::endl;
+    std::string message = "";
+    std::string filename = "out.wav";
+    PSK::Mode mode = PSK::BPSK;
+    PSK::SymbolRate symbol_rate = PSK::S125;
+
+    int message_flag = 0;
+
+    for (int i = 0; i < argc; i++) {
+        if (std::string(argv[i]) == "-m") {
+            std::cout << "mode" << std::endl;
+            if (std::string(argv[i + 1]) == "bpsk") {
+                mode = PSK::BPSK;
+            } else if (std::string(argv[i + 1]) == "qpsk") {
+                mode = PSK::QPSK;
+            } else {
+                std::cout << "Invalid mode: -m bpsk | -m qpsk" << std::endl;
+                return 1;
+            }
+        }
+        if (std::string(argv[i]) == "-s") {
+            if (std::string(argv[i + 1]) == "125") {
+                symbol_rate = PSK::S125;
+            } else if (std::string(argv[i + 1]) == "250") {
+                symbol_rate = PSK::S250;
+            } else if (std::string(argv[i + 1]) == "500") {
+                symbol_rate = PSK::S500;
+            } else {
+                std::cout << "Invalid symbol rate: -s 125 | -s 250 | -s 500" << std::endl;
+                return 1;
+            }
+        }
+        if (std::string(argv[i]) == "-f") {
+           filename = std::string(argv[i + 1]);
+        }
+        if (std::string(argv[i]) == "-t") {
+            message = std::string(argv[i + 1]);
+            message_flag = 1;
+        }
+    }
+
+    if (!message_flag) {
+        std::cout << "Enter message (Ctrl+D after newline to end): \n";
+        std::string line;
+        std::stringstream buffer;
+        while (std::getline(std::cin, line)){
+            buffer << line;
+            buffer << "\n";
+        }
+        message = buffer.str();
+    }
+
+    if (message.size() < 2) {
+        std::cout << "No message detected!" << std::endl;
         return 1;
-    }
-    
-    std::string message = argv[1];
-
-    std::string mode_str = "b125";
-    PSK::Mode mode = PSK::BPSK125;
-    std::string output_file = "./out.wav";
-    std::string callsign = "N0CALL";
-
-    for (int i = 0; i < argc; ++i) {
-        if ((std::string) argv[i] == "-m") {
-            mode_str = argv[i + 1];
-        }
-        if ((std::string) argv[i] == "-f") {
-            output_file = argv[i + 1];
-        }
-        if ((std::string) argv[i] == "-c") {
-            callsign = argv[i + 1];
-        }
-    }    
-
-    if (mode_str == "b125") {
-        mode = PSK::BPSK125;
-    } else if (mode_str == "b250") {
-        mode = PSK::BPSK250;
-    } else if (mode_str == "b500") {
-        mode = PSK::BPSK500;
-    } else if (mode_str == "q125") {
-        mode = PSK::QPSK125;
-    } else if (mode_str == "q250") {
-        mode = PSK::QPSK250;
-    } else if (mode_str == "q500") {
-        mode = PSK::QPSK500;
     } else {
-        std::cout << "Invalid mode: " << mode_str << std::endl;
-        return 1;
+        std::cout << std::endl << "Encoding message: \n" << message << std::endl;
     }
 
-    if (callsign == "N0CALL") {
-        PSK psk(output_file, mode);
-        psk.encodeTextData(message);
-        psk.dumpBitStream();
-    } else {
-        PSK psk(output_file, mode, callsign);
-        psk.encodeTextData(message);
-    }
+    std::cout << "Mode: " << (mode == PSK::BPSK ? "BPSK" : "QPSK") << ", ";
+    std::cout << "Symbol Rate: " << (symbol_rate == PSK::S125 ? "125" : (symbol_rate == PSK::S250 ? "250" : "500")) << ", ";
+    std::cout << "Filename: " << filename << std::endl;
+    std::cout << "Generating audio file..." << std::endl;
 
-    std::cout << output_file << std::endl;
-    
+    PSK psk(filename, mode, symbol_rate);
+    psk.encodeTextData(message);
     return 0;
 }
