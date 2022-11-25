@@ -6,43 +6,22 @@
  * This file contains a class 'PSK' which implements wav file
  * generation for both BPSK and QPSK. 
  * 
- * Usage:
- * Call constructor with file path, mode, and optional callsign.
- * Call encodeTextData(std::string message)
- * 
  * This will generate a wav file at the file path specified with PSK
  * audio data generated from the message and your specified mode.
- * 
- * Constructors:
- * It has two constructors, both 
- * require the file path and mode but one allows your to specify your call sign.
- * If you specify your callsign, it will be added (in morse code) to the
- * beginning and end of the wav file. If you do not specify your callsign
- * then it will not be included so it should be included in your message.
- * 
- * I make no guarantees that this fully complies with the public PSK31 
- * specifications (It currently does not!). Please take time to consider how 
- * to identify your station before transmitting any audio to prevent any
- * issues with the FCC or other operators in your area. 
  * 
  * Modes:
  * BPSK125, BPSK250, BPSK500
  * QPSK125, QPSK250, QPSK500
  * 
  * There currently is no support for the 31.25 or 62.5 baud modes, only
- * 125, 250, and 500 are supported. 
+ * 125, 250, 500, and 1000 are supported. 
  * 
- * IMPORTANT:
- * There is **no** cosine filtering. Decoding in Fldigi is fully functional but 
- * the audio is ***not clean***.
- * 
- * Example:
- * PSK psk("test.wav", PSK::QPSK500, "KD9GDC");
- * psk.encodeTextData("Hello World!");
+ * It needs some work, especially on the filter, but it works fine and
+ * generates clean enough audio (in BPSK 125, and 250 at least).
  * 
  * @date 2022-11-23
  * @copyright Copyright (c) 2022
- * @version 0.1
+ * @version 1.0
  */
 
 #include "PSK.h"
