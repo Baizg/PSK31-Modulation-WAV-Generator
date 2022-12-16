@@ -1,5 +1,7 @@
 # PSK31-Modulation-Generator
-A C++ based QPSK/BPSK wav file generator. This was made to be used on my [Giraffe Project](https://github.com/joshua-jerred/Giraffe).
+A C++ based QPSK/BPSK wav file generator made from scratch with the standard library! This was made to be used on my [Giraffe Project](https://github.com/joshua-jerred/Giraffe).
+
+You can read about it here: https://joshuajer.red/projects/psk-modulation.html
 
 #### IMPORTANT
 
