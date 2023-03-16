@@ -274,7 +274,7 @@ void PSK::addVaricode(char c) {
         if (!(varicode & (1 << i)) && (!previous_bit)) {
             //std::cout << "size: " << i - 1;
 
-            bits[0] = i > 9 ? varicode >> 1 : varicode << (9 - i);
+            bits[0] = i > 9 ? varicode >> (i-9) : varicode << (9 - i);
             bits[1] = i > 9 ? varicode << (17 - i) : 0x00;
 
             //std::cout << " shifted: " << std::bitset<8>(bits[0]) << " " << std::bitset<8>(bits[1]) << std::endl;
